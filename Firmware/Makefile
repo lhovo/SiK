@@ -77,7 +77,7 @@ all:		build
 #
 # Composite targets for handling actions.
 #
-build:		$(filter build~%,$(TARGETS)) check_code
+build:		$(filter build~%,$(TARGETS))
 install:	$(filter install~%,$(TARGETS))
 clean:		$(filter clean~%,$(TARGETS))
 
