@@ -34,7 +34,13 @@
 
 #include "radio.h"
 #include "tdm.h"
+#include "flash_layout.h"
+#include "at.h"
+#include "board.h"
 
+#ifdef CPU_SI1030
+#include "AES/aes.h"
+#endif
 
 // canary data for ram wrap. It is in at.c as the compiler
 // assigns addresses in alphabetial order and we want this at a low
@@ -42,7 +48,7 @@
 __pdata uint8_t pdata_canary = 0x41;
 
 // AT command buffer
-__pdata char at_cmd[AT_CMD_MAXLEN + 1];
+__xdata char at_cmd[AT_CMD_MAXLEN + 1];
 __pdata uint8_t	at_cmd_len;
 
 // mode flags
@@ -272,8 +278,8 @@ at_error(void)
 	printf("%s\n", "ERROR");
 }
 
-__pdata uint8_t		idx;
-__pdata uint32_t	at_num;
+__xdata uint8_t		idx;
+__xdata uint32_t	at_num;
 
 /*
   parse a number at idx putting the result in at_num
@@ -356,7 +362,7 @@ at_s(void)
 	// get the register number first
 	idx = 3;
 	at_parse_number();
-        sreg = at_num;
+	sreg = at_num;
 	// validate the selected sreg
 	if (sreg >= PARAM_MAX) {
 		at_error();
@@ -398,8 +404,16 @@ at_ampersand(void)
 
 	case 'U':
 		if (!strcmp(at_cmd + 4, "PDATE")) {
-			// force a flash error
-			volatile char x = *(__code volatile char *)0xfc00;
+			// Erase Flash signature forcing it into reprogram mode next reset
+			FLKEY = 0xa5;
+			FLKEY = 0xf1;
+			PSCTL = 0x03;				// set PSWE and PSEE
+			*(uint8_t __xdata *)FLASH_SIGNATURE_BYTES = 0xff;	// do the page erase
+			PSCTL = 0x00;				// disable PSWE/PSEE
+			
+			// Reset the device using sofware reset
+			RSTSRC |= 0x10;
+			
 			for (;;)
 				;
 		}
@@ -425,7 +439,21 @@ at_ampersand(void)
 			at_error();
 		}
 		break;
-		
+#ifdef INCLUDE_AES
+  case 'E':
+    switch (at_cmd[4]) {
+      case '?':
+        print_encryption_key();
+        return;
+        
+      case '=':
+        if (param_set_encryption_key((__xdata unsigned char *)&at_cmd[5])) {
+          at_ok();
+          return;
+        }
+        break;
+    }
+#endif // INCLUDE_AES
 	default:
 		at_error();
 		break;
@@ -435,13 +463,13 @@ at_ampersand(void)
 static void
 at_plus(void)
 {
-#ifdef BOARD_rfd900a
+#if defined BOARD_rfd900a || defined BOARD_rfd900p
 	__pdata uint8_t		creg;
 
 	// get the register number first
 	idx = 4;
 	at_parse_number();
-        creg = at_num;
+	creg = at_num;
 
 	switch (at_cmd[3])
 	{
@@ -452,7 +480,7 @@ at_plus(void)
 		}
 		idx = 5;
 		at_parse_number();
-		PCA0CPH3 = at_num & 0xFF;
+		PCA0CPH0 = at_num & 0xFF;
 		radio_set_diversity(false);
 		at_ok();
 		return;
@@ -475,6 +503,15 @@ at_plus(void)
 			return;
 		}
 		break;
+  case 'F': // AT+Fx? get calibration value
+    switch (at_cmd[idx])
+    {
+    case '?':
+      at_num = calibration_force_get(at_num);
+      printf("%lu\n",at_num);
+      return;
+    }
+    break;
 	case 'L': // AT+L lock bootloader area if all calibrations written
 		if (calibration_lock())
 		{
@@ -484,6 +521,6 @@ at_plus(void)
 		}
 		return;
 	}
-#endif //BOARD_rfd900a
+#endif // BOARD_rfd900a || BOARD_rfd900p
 	at_error();
 }

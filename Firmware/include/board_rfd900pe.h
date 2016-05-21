@@ -1,6 +1,7 @@
 // -*- Mode: C; c-basic-offset: 8; -*-
 //
 // Copyright (c) 2011 Michael Smith, All Rights Reserved
+// Copyright (c) 2012 Seppo Saario, All Rights Reserved
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,26 +26,45 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 // OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-
+//
 ///
-/// @file	flash.h
-///		Prototypes for the flash interface.
+/// @file	board_rfd900p.h
 ///
+/// Board-specific definitions and documentation for the RFD900P,
+/// Version 1.2 onwards.
+/// 
+/// The RFD900 board provides pads for programming
+/// the Si1000 via the debug port.
+/// The pads are on the single horizontal header on the bottom of the board.
+/// Pin 1 = GND, Pin 2 = +5V, Pin 3 = C2D, Pin 4 = C2CK
+///
+/// The SiLabs programmer has a 10-pin ribbon cable, for which you will
+/// need to make an adapter.  The User Guide, linked from the page here:
+///
+/// http://www.silabs.com/products/mcu/Pages/USBDebug.aspx
+/// describes the pinout of the cable.
+///
+/// Connect the SiLabs debug adapter to the RFD900 V1.2+ as follows:
+///
+/// Debug Adapter Pin:                 	RFD900A V1.2+ 9W header pin (J2)
+///
+///        2 <--------------------------> GND 	(Pin 2)
+///        4 <--------------------------> C2D 	(Pin 4)
+///        7 <--------------------------> C2CK	(Pin 5)
+///       10 <--------------------------> +5V	(Pin 3)
+///
+///
+/// If you are making your own adapter board for the RFD900, note that
+/// whilst the stock firmware requires the ENABLE pin be tied low,
+/// it is a flow control input to the SiK radio firmware.
 
-// The Si1030 doesn't have a flash scratch page
-// so the read and write's are slightly diffrent
-#ifdef CPU_SI1030
-#define FLASH_ERASE_SCRATCH 0x03
-#define FLASH_WRITE_SCRATCH 0x01
-#define FLASH_READ_SCRATCH  0x00
-#define FLASH_DISABLE		0x00
-#else
-#define FLASH_ERASE_SCRATCH 0x07
-#define FLASH_WRITE_SCRATCH 0x05
-#define FLASH_READ_SCRATCH  0x04
-#define FLASH_DISABLE		0x00
-#endif
 
-extern void	flash_erase_scratch(void);
-extern uint8_t	flash_read_scratch(__pdata uint16_t address);
-extern void	flash_write_scratch(__pdata uint16_t address, __pdata uint8_t c);
+#ifndef _BOARD_RFD900PE
+#define _BOARD_RFD900PE
+
+#include "board_rfd900p.h"
+
+#define BOARD_rfd900p
+#define INCLUDE_AES
+
+#endif // _BOARD_RFD900PE

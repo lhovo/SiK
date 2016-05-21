@@ -58,14 +58,14 @@ static __pdata uint8_t seqnum;
 static void mavlink_crc(register uint8_t crc_extra)
 {
 	register uint8_t length = pbuf[1];
-        __pdata uint16_t sum = 0xFFFF;
-	__pdata uint8_t i, stoplen;
+	__xdata uint16_t sum = 0xFFFF;
+	__xdata uint8_t i, stoplen;
 
 	stoplen = length + 6;
 
-        // MAVLink 1.0 has an extra CRC seed
-        pbuf[length+6] = crc_extra;
-        stoplen++;
+	// MAVLink 1.0 has an extra CRC seed
+	pbuf[length+6] = crc_extra;
+	stoplen++;
 
 	i = 1;
 	while (i<stoplen) {
@@ -74,7 +74,7 @@ static void mavlink_crc(register uint8_t crc_extra)
 		tmp ^= (tmp<<4);
 		sum = (sum>>8) ^ (tmp<<8) ^ (tmp<<3) ^ (tmp>>4);
 		i++;
-        }
+	}
 
 	pbuf[length+6] = sum&0xFF;
 	pbuf[length+7] = sum>>8;
@@ -126,7 +126,7 @@ static void swap_bytes(__pdata uint8_t ofs, __pdata uint8_t len)
 /// send a MAVLink status report packet
 void MAVLink_report(void)
 {
-        struct mavlink_RADIO_v10 *m = (struct mavlink_RADIO_v10 *)&pbuf[6];
+	struct mavlink_RADIO_v10 *m = (struct mavlink_RADIO_v10 *)&pbuf[6];
 	pbuf[0] = MAVLINK10_STX;
 	pbuf[1] = sizeof(struct mavlink_RADIO_v10);
 	pbuf[2] = seqnum++;
@@ -134,13 +134,13 @@ void MAVLink_report(void)
 	pbuf[4] = RADIO_SOURCE_COMPONENT;
 	pbuf[5] = MAVLINK_MSG_ID_RADIO;
 
-        m->rxerrors = errors.rx_errors;
-        m->fixed    = errors.corrected_packets;
-        m->txbuf    = serial_read_space();
-        m->rssi     = statistics.average_rssi;
-        m->remrssi  = remote_statistics.average_rssi;
-        m->noise    = statistics.average_noise;
-        m->remnoise = remote_statistics.average_noise;
+	m->rxerrors = errors.rx_errors;
+	m->fixed    = errors.corrected_packets;
+	m->txbuf    = serial_read_space();
+	m->rssi     = statistics.average_rssi;
+	m->remrssi  = remote_statistics.average_rssi;
+	m->noise    = statistics.average_noise;
+	m->remnoise = remote_statistics.average_noise;
 	mavlink_crc(MAVLINK_RADIO_CRC_EXTRA);
 
 	if (serial_write_space() < sizeof(struct mavlink_RADIO_v10)+8) {
@@ -150,7 +150,7 @@ void MAVLink_report(void)
 
 	serial_write_buf(pbuf, sizeof(struct mavlink_RADIO_v10)+8);
 
-        // now the new RADIO_STATUS common message
+	// now the new RADIO_STATUS common message
 	pbuf[5] = MAVLINK_MSG_ID_RADIO_STATUS;
 	mavlink_crc(MAVLINK_RADIO_STATUS_CRC_EXTRA);
 

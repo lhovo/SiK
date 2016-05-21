@@ -28,9 +28,9 @@
 //
 //
 ///
-/// @file	board_rfd900a.h
+/// @file	board_rfd900u.h
 ///
-/// Board-specific definitions and documentation for the RFD900A,
+/// Board-specific definitions and documentation for the RFD900U,
 /// Version 1.2 onwards.
 /// 
 /// The RFD900 board provides pads for programming
@@ -59,24 +59,29 @@
 /// it is a flow control input to the SiK radio firmware.
 
 
-#ifndef _BOARD_RFD900A
-#define _BOARD_RFD900A
+#ifndef _BOARD_RFD900U
+#define _BOARD_RFD900U
 
 #include <compiler_defs.h>
-#include <Si1000_defs.h>
+#include <Si1020_defs.h>
 
-#define BOARD_ID	  0x43
-#define BOARD_NAME	"RFD900A"
+// Ensure that the BoardID has the upper most bit set
+// This tells the tool chain we are dealing with a CPU_SI1030 device
+#define BOARD_ID	 0x80 | 0x01
+#define BOARD_NAME	"RFD900U"
+#define CPU_SI1030
 
 #define BOARD_MINTXPOWER 0		// Minimum transmit power level
-#define BOARD_MAXTXPOWER 30		// Maximum transmit power level
+#define BOARD_MAXTXPOWER 20		// Maximum transmit power level
+
+//#define WATCH_DOG_ENABLE
 
 // GPIO definitions (not exported)
-SBIT(LED_RED,	   SFR_P1, 6);
-SBIT(LED_GREEN,	   SFR_P1, 5);
+SBIT(LED_RED,	   SFR_P3, 6);
+SBIT(LED_GREEN,	   SFR_P3, 7);
 SBIT(PIN_CONFIG,   SFR_P0, 2);
 SBIT(PIN_ENABLE,   SFR_P0, 3);
-SBIT(PA_ENABLE,    SFR_P2, 5);         // Power Amplifier Enable
+//SBIT(PA_ENABLE,    SFR_P2, 5);         // Power Amplifier Enable
 
 
 // Signal polarity definitions
@@ -86,30 +91,29 @@ SBIT(PA_ENABLE,    SFR_P2, 5);         // Power Amplifier Enable
 
 // UI definitions
 #define LED_BOOTLOADER	LED_RED
-#define LED_RADIO	LED_GREEN
+#define LED_RADIO		LED_GREEN
 #define LED_ACTIVITY	LED_RED
 #define BUTTON_BOOTLOAD	PIN_CONFIG
 
 // Serial flow control
-#define SERIAL_RTS	PIN_ENABLE	// always an input
-#define SERIAL_CTS	PIN_CONFIG	// input in bootloader, output in app
+//#define SERIAL_RTS	PIN_ENABLE	// always an input
+//#define SERIAL_CTS	PIN_CONFIG	// input in bootloader, output in app
 
 // board-specific hardware config
 #define HW_INIT							\
-	do {							\
-		/* GPIO config */				\
-                P0SKIP  |=  0xCF;               /* P0 UART avail on XBAR */     \
-                P1SKIP  |=  0x78;               /* P1 SPI1, CEX0 avail on XBAR */       \
-                P2SKIP  |=  0xFF;               /* P2 nothing avail on XBAR, All GPIO */        \
-		SFRPAGE	 =  CONFIG_PAGE;			  \
-		P1MDOUT	|= 0xF5;	/* SCK1, MOSI1, MISO1 push-pull was 60 */ \
-		P1DRV	|= 0xF5;	/* SPI signals use high-current mode, LEDs and PAEN High current drive was 60 */ \
-                P2MDOUT |= 0x20;        /* PA_ENABLE (P2.5) output */ \
-                P2DRV   |= 0x20;        /* PA_ENABLE (P2.5) high current drive*/ \
-		SFRPAGE	 =  LEGACY_PAGE;			  \
-		/* INT0 is the radio interrupt, on P0.7 */	\
-		IT01CF   =  (IT01CF & 0xf) | 0x7;		\
-		IT0	 = 0;	/* INT0 level triggered */	\
+	do { \
+		SFRPAGE  = CONFIG_PAGE; \
+		P3MDOUT |= 0x40;		/* Led Red */ \
+		P3DRV   |= 0x40;		/* Led Red */ \
+		SFRPAGE  = LEGACY_PAGE;	\
+		/* Setup Timers */ \
+		TMOD	 = (TMOD & ~0xf0) | 0x20; /* TMOD: timer 1 in 8-bit autoreload */ \
+		TR1		 = 1;			/* START Timer1 */ \
+		TI0		 = 1;			/* Indicate TX0 ready */ \
+		/* INT0 is the radio interrupt, on P0.1 */ \
+		IT01CF	 = (IT01CF & 0xf) | 0x01;\
+		IT0		 = 0;			/* INT0 level triggered */ \
+		P2		 = 0xFF;		/* P2 bug fix for SDCC and Raisonance*/ \
 	} while(0)
 
 // application/board-specific hardware config
@@ -125,9 +129,8 @@ SBIT(PA_ENABLE,    SFR_P2, 5);         // Power Amplifier Enable
 #define EZRADIOPRO_OSC_CAP_VALUE 0xB6 // Measured on RFD900 V1.1
 #define ENABLE_RFD900_SWITCH 1        // Define RF switches on the module (V1.1 are V1.2 the same)
 #define RFD900_DIVERSITY 1            // Enable/Disable diversity on RFD900 (V1.1 are V1.2 the same)
-#define RFD900_INT_TX_POW 6           // TX power feeding into the amp
-#define TEMP_OFFSET 33                // Use the internal offset register with this extra cal offset
-SBIT(IRQ,  SFR_P0, 7);                // Connection within RFD900 module, P0.7 is connected to nIRQ
-SBIT(NSS1, SFR_P1, 4);                // SI100x Internal Connection
+#define TEMP_OFFSET 45                // Use the internal offset register with this extra cal offset
+SBIT(IRQ,  SFR_P0, 1);                // Connection within RFD900 module, P0.1 is connected to nIRQ
+SBIT(NSS1, SFR_P2, 3);                // SI1020 Internal Connection
 
-#endif // _BOARD_RFD900A
+#endif // _BOARD_RFD900U

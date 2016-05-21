@@ -102,6 +102,12 @@
 # include "board_rfd900.h"
 #elif defined(BOARD_rfd900a)
 # include "board_rfd900a.h"
+#elif defined(BOARD_rfd900u)
+# include "board_rfd900u.h"
+#elif defined(BOARD_rfd900p)
+# include "board_rfd900p.h"
+#elif defined(BOARD_rfd900pe)
+# include "board_rfd900pe.h"
 #else
 # error Must define a BOARD_ value before including this file.
 #endif

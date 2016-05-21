@@ -42,6 +42,10 @@
 #include "freq_hopping.h"
 #include "crc.h"
 
+#ifdef INCLUDE_AES
+#include "AES/aes.h"
+#endif
+
 #define USE_TICK_YIELD 1
 
 /// the state of the tdm system
@@ -101,7 +105,7 @@ __pdata uint16_t transmit_wait;
 __pdata uint8_t duty_cycle;
 
 /// the average duty cycle we have been transmitting
-__data static float average_duty_cycle;
+__pdata static float average_duty_cycle;
 
 /// duty cycle offset due to temperature
 __pdata uint8_t duty_cycle_offset;
@@ -126,7 +130,7 @@ __pdata static uint16_t lbt_rand;
 
 /// test data to display in the main loop. Updated when the tick
 /// counter wraps, zeroed when display has happened
-__pdata uint8_t test_display;
+__xdata uint8_t test_display;
 
 /// set when we should send a statistics packet on the next round
 static __bit send_statistics;
@@ -176,9 +180,9 @@ tdm_show_rssi(void)
 static void
 display_test_output(void)
 {
-	if (test_display & AT_TEST_RSSI) {
-		tdm_show_rssi();
-	}
+  if (test_display & AT_TEST_RSSI) {
+    tdm_show_rssi();
+  }
 }
 
 
@@ -370,12 +374,19 @@ link_update(void)
 	if (received_packet) {
 		unlock_count = 0;
 		received_packet = false;
+#ifdef TDM_SYNC_LOGIC
+		TDM_SYNC_PIN = true;
+#endif // TDM_SYNC_LOGIC
 	} else {
 		unlock_count++;
 	}
 	if (unlock_count < 6) {
 		LED_RADIO = LED_ON;
 	} else {
+#ifdef TDM_SYNC_LOGIC
+		TDM_SYNC_PIN = false;
+#endif // TDM_SYNC_LOGIC
+
 		LED_RADIO = blink_state;
 		blink_state = !blink_state;
 	}
@@ -481,6 +492,13 @@ tdm_serial_loop(void)
 
 	_canary = 42;
 
+#ifdef RADIO_SPLAT_TESTING_MODE
+		for (;;) {
+				radio_set_channel(0);
+				radio_transmit(MAX_PACKET_LENGTH, pbuf, 0);
+				//radio_receiver_on();
+		}
+#else
 	for (;;) {
 		__pdata uint8_t	len;
 		__pdata uint16_t tnow, tdelta;
@@ -562,7 +580,11 @@ tdm_serial_loop(void)
 					// the serial port
 					//printf("rcv(%d,[", len);
 					LED_ACTIVITY = LED_ON;
-					serial_write_buf(pbuf, len);
+#ifdef INCLUDE_AES
+          serial_decrypt_buf(pbuf, len);
+#else
+          serial_write_buf(pbuf, len);
+#endif
 					LED_ACTIVITY = LED_OFF;
 					//printf("]\n");
 				}
@@ -584,6 +606,16 @@ tdm_serial_loop(void)
 			last_link_update = tnow;
 		}
 
+#ifdef INCLUDE_AES
+    // Ensure we arn't needing to hop
+    // If we have any packets that need decrypting lets do it now.
+    if(tdm_state_remaining > tx_window_width/2)
+    {
+      decryptPackets();
+      continue;
+    }
+#endif
+    
 		if (lbt_rssi != 0) {
 			// implement listen before talk
 			if (radio_current_rssi() < lbt_rssi) {
@@ -660,6 +692,11 @@ tdm_serial_loop(void)
 			max_xmit = max_data_packet_length;
 		}
 
+#if PIN_MAX > 0
+		// Check to see if any pins have changed state
+		pins_user_check();
+#endif
+		
 		// ask the packet system for the next packet to send
 		if (send_at_command && 
 		    max_xmit >= strlen(remote_at_cmd)) {
@@ -750,6 +787,7 @@ tdm_serial_loop(void)
 			LED_ACTIVITY = LED_OFF;
 		}
 	}
+#endif
 }
 
 #if 0
@@ -900,16 +938,15 @@ tdm_init(void)
 	}
 
 	// set the silence period to two times the packet latency
-        silence_period = 2*packet_latency;
+	silence_period = 2*packet_latency;
 
-        // set the transmit window to allow for 3 full sized packets
+	// set the transmit window to allow for 3 full sized packets
 	window_width = 3*(packet_latency+(max_data_packet_length*(uint32_t)ticks_per_byte));
 
-        // min listen time is 5ms
-        lbt_min_time = LBT_MIN_TIME_USEC/16;
-        
 	// if LBT is enabled, we need at least 3*5ms of window width
 	if (lbt_rssi != 0) {
+		// min listen time is 5ms
+		lbt_min_time = LBT_MIN_TIME_USEC/16;
 		window_width = constrain(window_width, 3*lbt_min_time, window_width);
 	}
 
@@ -943,6 +980,10 @@ tdm_init(void)
 		i = max_data_packet_length;
 	}
 	packet_set_max_xmit(i);
+
+#ifdef TDM_SYNC_LOGIC
+		TDM_SYNC_PIN = false;
+#endif // TDM_SYNC_LOGIC
 
 	// crc_test();
 
